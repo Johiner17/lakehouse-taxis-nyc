@@ -1,0 +1,18 @@
+services:
+  spark:
+    build: .
+    container_name: lakehouse_spark
+    # Tope de memoria del contenedor: tu Docker tiene ~3.5 GiB en total.
+    # 3g deja margen: el driver usa 2g y la JVM necesita memoria extra fuera del heap.
+    mem_limit: 3g
+    environment:
+      SPARK_DRIVER_MEMORY: 2g
+    volumes:
+      - ./:/app                  # tu código y tus datos (carpeta data/) viven en tu PC
+      - ivy_cache:/ivy           # caché de los JAR de Delta, para no bajarlos cada vez
+    ports:
+      - "127.0.0.1:4040:4040"    # interfaz web de Spark, solo accesible desde tu PC
+    command: ["sleep", "infinity"]   # contenedor vivo; ejecutamos scripts con "exec"
+
+volumes:
+  ivy_cache:

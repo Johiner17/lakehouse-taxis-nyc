@@ -1,0 +1,5 @@
+delta-spark==4.1.0
+# Versión exacta de Spark: Delta usa clases internas de Spark, y cambian entre parches
+# (con 4.1.4 falló, con la 4.1.1 de la época de Delta 4.1.0 debería funcionar).
+pyspark==4.1.1
+requests
