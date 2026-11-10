@@ -4,3 +4,4 @@ spark-warehouse/
 metastore_db/
 derby.log
 .env
+logs/

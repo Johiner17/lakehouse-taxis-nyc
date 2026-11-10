@@ -39,6 +39,16 @@ def limites_mes(mes: str):
     fin = date(a + 1, 1, 1) if m == 12 else date(a, m + 1, 1)
     return inicio.isoformat(), fin.isoformat()
 
+def meses_en_gold(spark) -> set[str]:
+    """Meses que ya tienen datos en la tabla de hechos (se deducen de fecha_recogida)."""
+    if not DeltaTable.isDeltaTable(spark, GOLD_FCT):
+        return set()
+    filas = (
+        spark.read.format("delta").load(GOLD_FCT)
+        .select(F.date_format("fecha_recogida", "yyyy-MM").alias("mes")).distinct().collect()
+    )
+    return {f["mes"] for f in filas}
+
 
 def procesar_mes(spark, mes: str):
     inicio, fin = limites_mes(mes)
@@ -92,7 +102,8 @@ def procesar_mes(spark, mes: str):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--solo", help="procesar un único mes (AAAA-MM)")
+    p.add_argument("--solo", help="procesar un único mes (AAAA-MM), siempre se recalcula")
+    p.add_argument("--forzar", action="store_true", help="recalcular también los meses ya cargados")
     args = p.parse_args()
 
     spark = get_spark("gold-taxis")
@@ -103,7 +114,11 @@ if __name__ == "__main__":
     else:
         filas = spark.read.format("delta").load(SILVER).select("_mes_origen").distinct().collect()
         meses = sorted(f["_mes_origen"] for f in filas)
+    ya = set() if (args.solo or args.forzar) else meses_en_gold(spark)
     for mes in meses:
+        if mes in ya:
+            print(f"{mes}: omitido (ya cargado)")
+            continue
         procesar_mes(spark, mes)
 
     # Primera consulta de negocio: las 10 zonas con más viajes (une el hecho con la dimensión).
