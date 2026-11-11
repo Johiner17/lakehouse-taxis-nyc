@@ -1,0 +1,24 @@
+resources:
+  jobs:
+    lakehouse_taxis_nyc:
+      name: lakehouse_taxis_nyc
+      tasks:
+        - task_key: bronze
+          notebook_task:
+            notebook_path: /Workspace/Users/ajohiner.07@gmail.com/01_bronze
+            source: WORKSPACE
+        - task_key: silver
+          depends_on:
+            - task_key: bronze
+          notebook_task:
+            notebook_path: /Workspace/Users/ajohiner.07@gmail.com/02_silver
+            source: WORKSPACE
+        - task_key: gold
+          depends_on:
+            - task_key: silver
+          notebook_task:
+            notebook_path: /Workspace/Users/ajohiner.07@gmail.com/03_gold
+            source: WORKSPACE
+      queue:
+        enabled: true
+      performance_target: PERFORMANCE_OPTIMIZED
