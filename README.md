@@ -1,6 +1,19 @@
 # lakehouse-taxis-nyc
 
-Lakehouse con **arquitectura medallion** (bronze → silver → gold) sobre los viajes de taxis amarillos de Nueva York: **128.2 millones de filas** (2023-01 a 2025-12). Se construye con **Apache Spark y Delta Lake**, corre de forma local en Docker y se replica en **Databricks Free Edition** (Unity Catalog + Jobs). Ambas versiones se validan entre sí por conciliación de totales.
+<h1 align="center">Lakehouse de taxis de Nueva York</h1>
+
+<p align="center">
+  Lakehouse con arquitectura medallion de punta a punta: ingesta, capas bronze, silver y gold
+  con Spark y Delta Lake, calidad de datos con cuarentena, orquestación y réplica en Databricks.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Apache%20Spark-E25A1C?logo=apachespark&logoColor=white" alt="Apache Spark">
+  <img src="https://img.shields.io/badge/Delta%20Lake-00ADD4" alt="Delta Lake">
+  <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" alt="Databricks">
+  <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker">
+</p>
 
 > Proyecto de portafolio de ingeniería de datos. Todas las decisiones de diseño están documentadas en este README y en [`docs/`](docs/).
 
@@ -132,9 +145,27 @@ docker compose exec spark python src/gold_taxis.py
 3. Importar los notebooks `01_bronze`, `02_silver` y `03_gold`.
 4. Crear un Job `lakehouse_taxis_nyc` con tres tareas encadenadas (bronze → silver → gold) en cómputo serverless.
 
+### Capturas
+
+**Job con tres tareas encadenadas (bronze → silver → gold):**
+
 ![DAG del Job en Databricks](docs/img/databricks_job_dag.png)
 
+**Cronología de una ejecución:**
+
 ![Cronología de una ejecución](docs/img/databricks_job_cronologia.png)
+
+**Prueba de fallo: `silver` falla y `gold` no se ejecuta:**
+
+![Ejecución con fallo en silver](docs/img/databricks_job_fallo.png)
+
+**Arquitectura medallion en Unity Catalog:**
+
+![Catálogo con esquemas y tablas](docs/img/databricks_catalogo.png)
+
+**Resultado: Top 10 de zonas de origen:**
+
+![Top 10 de zonas](docs/img/databricks_top10_zonas.png)
 
 Las diferencias respecto a la versión local: tablas gestionadas de Unity Catalog en vez de rutas, `_metadata.file_name` en lugar de `input_file_name()`, y sin `persist()` (el cómputo serverless no lo admite).
 
