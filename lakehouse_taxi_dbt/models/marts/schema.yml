@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: mrt_demanda_mensual_distrito
+    description: "Demanda, ingresos y métricas mensuales agrupadas por distrito."
+    columns:
+      - name: mes
+        description: "Primer día del mes al que corresponden las métricas agregadas."
+        data_tests:
+          - not_null
+      - name: distrito
+        description: "Distrito asociado a la zona de origen; conserva las etiquetas presentes en la dimensión."
+        data_tests:
+          - not_null
+      - name: viajes
+        description: "Cantidad total de viajes en el mes y distrito."
+        data_tests:
+          - not_null
+      - name: viajes_con_alertas
+        description: "Cantidad de viajes con alertas en el mes y distrito."
+      - name: viajes_limpios
+        description: "Cantidad de viajes clasificados como limpios en el mes y distrito."
+      - name: ingresos_total
+        description: "Suma de ingresos de los viajes en el mes y distrito."
+        data_tests:
+          - not_null
+      - name: propinas_total
+        description: "Suma de propinas de los viajes en el mes y distrito."
+      - name: distancia_total_millas
+        description: "Suma de las distancias de los viajes, en millas."
+      - name: duracion_total_min
+        description: "Suma de las duraciones de los viajes, en minutos."
+      - name: viajes_pago_tarjeta
+        description: "Cantidad de viajes clasificados con pago con tarjeta."
+      - name: ingreso_medio_por_viaje
+        description: "Ingresos totales divididos entre viajes; se redondea a dos decimales. Es nulo si los viajes suman cero."

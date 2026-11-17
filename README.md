@@ -221,7 +221,7 @@ Lectura honesta de los resultados: las mediciones se hicieron en una laptop de 8
 
 ## Siguientes pasos
 
-- [ ] Cargar la capa gold en un warehouse (Snowflake o BigQuery) con modelos dbt.
+- [x] Cargar la capa gold en Snowflake y modelarla con dbt (staging, mart mensual por distrito, pruebas de calidad y documentación).
 - [ ] Mostrar resúmenes finales solo cuando hubo trabajo nuevo, para acortar la corrida sin novedades.
 - [ ] Parametrizar los notebooks de Databricks (widgets) para ejecutar un mes concreto desde el Job.
 

@@ -1,0 +1,48 @@
+version: 2
+
+sources:
+  - name: raw
+    database: NYC_TAXI_DW
+    schema: RAW
+    description: "Tablas Gold cargadas desde Delta Lake."
+    tables:
+      - name: dim_zona
+        identifier: RAW_DIM_ZONA
+        description: "Zonas y distritos de los taxis."
+        columns:
+          - name: zona_id
+            description: "Identificador de la zona de taxi; clave usada para relacionar la dimensión con los hechos."
+          - name: distrito
+            description: "Distrito asociado a la zona, por ejemplo Manhattan o Queens."
+          - name: zona
+            description: "Nombre de la zona de taxi."
+          - name: tipo_servicio
+            description: "Tipo de servicio asociado a la zona según la dimensión de origen."
+          - name: ingested_at
+            description: "Fecha y hora en que el registro se insertó en la tabla RAW de Snowflake."
+      - name: fct_demanda_diaria_zona
+        identifier: RAW_FCT_DEMANDA_DIARIA_ZONA
+        description: "Demanda diaria agregada por zona de origen."
+        columns:
+          - name: fecha_recogida
+            description: "Fecha de recogida a la que corresponden las métricas agregadas."
+          - name: zona_origen_id
+            description: "Identificador de la zona donde se originaron los viajes."
+          - name: viajes
+            description: "Cantidad total de viajes para la fecha y zona."
+          - name: viajes_con_alertas
+            description: "Cantidad de viajes marcados con alertas por el proceso de calidad de origen."
+          - name: viajes_limpios
+            description: "Cantidad de viajes clasificados como limpios por el proceso de calidad de origen."
+          - name: ingresos_total
+            description: "Suma del importe de ingresos reportado para los viajes agregados."
+          - name: propinas_total
+            description: "Suma de las propinas reportadas para los viajes agregados."
+          - name: distancia_total_millas
+            description: "Suma de las distancias de los viajes, expresada en millas."
+          - name: duracion_total_min
+            description: "Suma de las duraciones de los viajes, expresada en minutos."
+          - name: viajes_pago_tarjeta
+            description: "Cantidad de viajes cuyo método de pago se clasificó como tarjeta."
+          - name: ingested_at
+            description: "Fecha y hora en que el registro se insertó en la tabla RAW de Snowflake."
