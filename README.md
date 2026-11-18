@@ -3,8 +3,8 @@
 <h1 align="center">Lakehouse de taxis de Nueva York</h1>
 
 <p align="center">
-  Lakehouse con arquitectura medallion de punta a punta: ingesta, capas bronze, silver y gold
-  con Spark y Delta Lake, calidad de datos con cuarentena, orquestación y réplica en Databricks.
+  Pipeline de ingeniería de datos de punta a punta: arquitectura medallion con Spark y Delta Lake,
+  ejecución en Databricks y publicación analítica en Snowflake con dbt.
 </p>
 
 <p align="center">
@@ -12,6 +12,8 @@
   <img src="https://img.shields.io/badge/Apache%20Spark-E25A1C?logo=apachespark&logoColor=white" alt="Apache Spark">
   <img src="https://img.shields.io/badge/Delta%20Lake-00ADD4" alt="Delta Lake">
   <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" alt="Databricks">
+  <img src="https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white" alt="Snowflake">
+  <img src="https://img.shields.io/badge/dbt-FF694B?logo=dbt&logoColor=white" alt="dbt">
   <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker">
 </p>
 
@@ -27,6 +29,8 @@
 - **Medición de rendimiento** con un laboratorio reproducible (archivos pequeños, poda de particiones, Z-order, AQE), reportando mediana y rango por el ruido de una laptop de 8 GB.
 - **Orquestación** en dos entornos: un script local con logs y códigos de salida, y un Job de Databricks con dependencias entre tareas.
 - **Validación entre entornos**: el pipeline local y el de Databricks producen exactamente los mismos totales.
+- **Publicación analítica**: exportación de Gold a Parquet, carga validada en Snowflake y modelado con dbt.
+- **Calidad y documentación en dbt**: pruebas de claves, relaciones, métricas y granularidad; catálogo de modelos y columnas.
 
 ## Arquitectura
 
@@ -37,8 +41,13 @@ flowchart LR
     C --> D[Silver<br/>deduplicado, cuarentena, alertas]
     D --> E[Gold<br/>demanda diaria por zona]
     Z[taxi_zone_lookup.csv] --> F[dim_zona]
-    F --> G[Consultas / BI]
-    E --> G
+    E --> X[Exportación Parquet]
+    F --> X
+    X --> R[Snowflake RAW<br/>copia de Gold]
+    R --> S[dbt STAGING<br/>vistas]
+    S --> M[dbt MARTS<br/>demanda mensual por distrito]
+    M --> G[Analistas<br/>SQL / BI / Python]
+    E --> H[Consumo Lakehouse<br/>Spark / Databricks]
     D -. rechazados .-> Q[(Cuarentena<br/>con motivo)]
 ```
 
@@ -48,20 +57,33 @@ flowchart LR
 | **Silver** | Duplicados exactos eliminados, filas imposibles a cuarentena, columnas derivadas (`viaje_id`, `fecha_recogida`, `hora_recogida`, `duracion_min`) y columnas de alerta para lo sospechoso. | `replaceWhere` por mes |
 | **Gold** | `fct_demanda_diaria_zona` (un registro por día y zona de origen) y `dim_zona`. | `MERGE` por mes |
 
+En Snowflake, la tabla RAW recibe una **copia de las tablas Gold** exportada desde el Lakehouse. `RAW` nombra la primera capa de ingesta dentro de Snowflake; no contiene los archivos originales de NYC TLC.
+
+| Capa en Snowflake/dbt | Contenido en este proyecto |
+| --- | --- |
+| **RAW** | `RAW_DIM_ZONA` y `RAW_FCT_DEMANDA_DIARIA_ZONA`, cargadas desde los Parquet de Gold. |
+| **STAGING** | Vistas dbt que exponen las fuentes RAW con nombres y estructura consistentes. |
+| **MARTS** | `MRT_DEMANDA_MENSUAL_DISTRITO`, agregada por mes y distrito para análisis. |
+
 ## Stack
 
-| Local | Databricks Free Edition |
+| Tecnología | Uso en el proyecto |
 | --- | --- |
-| Spark 4.1.1 (modo local) + delta-spark 4.1.0 | Cómputo serverless |
-| Python 3.12, Java 17 | Notebooks en Python |
-| Docker Compose | Unity Catalog (catálogo `workspace`) |
-| Orquestador propio (`run_pipeline.py`) | Databricks Jobs |
+| **Python 3.12 / Java 17** | Código de ingesta, orquestación y transformaciones. |
+| **Apache Spark 4.1.1** | Procesamiento distribuido de los archivos y tablas. |
+| **Delta Lake 4.1.0** | Formato transaccional para las capas Bronze, Silver y Gold. |
+| **Docker Compose** | Entorno reproducible para ejecutar el pipeline local. |
+| **Databricks Free Edition** | Ejecución serverless de notebooks y Jobs; tablas en Unity Catalog (`workspace`). |
+| **Snowflake** | Warehouse que recibe las tablas Gold para consumo analítico. |
+| **dbt Core 1.12.7 / dbt-snowflake 1.12.5** | Modelos SQL, pruebas de calidad y documentación en Snowflake. |
 
 ## Datos
 
 - **Fuente:** [NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page), viajes de taxis amarillos en Parquet, más `taxi_zone_lookup.csv`.
 - **Local:** 36 meses (2023-01 a 2025-12), 128,202,548 filas procesadas. Los datos no se versionan en el repo: se descargan con `src/descargar.py`.
 - **Databricks Free:** solo 2024 (12 meses, 41,167,491 viajes), por los límites de la edición gratuita.
+- **Snowflake:** 265 filas en `RAW_DIM_ZONA`, 254,252 en `RAW_FCT_DEMANDA_DIARIA_ZONA` y 288 filas en el mart mensual por distrito.
+- **dbt:** las 14 pruebas seleccionadas de los modelos del proyecto aprobaron; se generó el catálogo local y se consultó en `http://localhost:8081`.
 
 El esquema cambia entre meses (por ejemplo `cbd_congestion_fee` aparece desde 2025-01 y `Airport_fee` cambia de capitalización). Bronze lo absorbe sin fallar: las columnas ausentes entran como nulas y las nuevas se conservan.
 
@@ -88,6 +110,10 @@ Los hallazgos que llevaron a estas reglas están en [`docs/exploracion_bronze.md
 
 **6. Horas locales sin desplazar.** La sesión de Spark usa zona horaria UTC y la inferencia de `TIMESTAMP_NTZ` está desactivada, para que las horas de Nueva York queden tal cual vienen en el archivo.
 
+**7. Lakehouse y warehouse son capas de servicio complementarias.** Bronze, Silver y Gold organizan el refinamiento en Delta Lake. Snowflake recibe una copia de Gold para ofrecer un entorno SQL de consumo; dbt construye staging y marts sin reemplazar las tablas originales del Lakehouse.
+
+**8. Publicación validada.** La carga a Snowflake usa Parquet, tablas temporales y comparación de conteos antes de confirmar la actualización de RAW. dbt valida claves, relaciones, métricas no negativas y la granularidad mes-distrito.
+
 ## Estructura del repositorio
 
 ```
@@ -100,8 +126,12 @@ lakehouse-taxis-nyc/
 │   ├── silver_taxis.py
 │   ├── gold_taxis.py
 │   ├── laboratorio_rendimiento.py
-│   └── run_pipeline.py             # orquestador local
+│   ├── run_pipeline.py             # orquestador local
+│   ├── export_gold_snowflake.py    # Gold Delta -> Parquet
+│   ├── load_gold_snowflake.py      # Parquet -> Snowflake RAW
+│   └── test_snowflake_connection.py
 ├── databricks/                     # notebooks exportados (00_setup a 03_gold)
+├── lakehouse_taxi_dbt/              # fuentes, staging, marts y pruebas dbt
 ├── docs/
 │   ├── exploracion_bronze.md
 │   ├── rendimiento.md
@@ -145,6 +175,39 @@ docker compose exec spark python src/gold_taxis.py
 3. Importar los notebooks `01_bronze`, `02_silver` y `03_gold`.
 4. Crear un Job `lakehouse_taxis_nyc` con tres tareas encadenadas (bronze → silver → gold) en cómputo serverless.
 
+### Snowflake y dbt
+
+El flujo Snowflake toma las tablas Gold del Lakehouse local, las exporta a Parquet y las carga de forma transaccional en RAW. dbt crea las vistas de staging y el mart mensual por distrito.
+
+Desde la raíz del repositorio, exporta y carga las tablas:
+
+```bash
+docker compose exec spark python src/export_gold_snowflake.py
+docker compose exec spark python src/load_gold_snowflake.py
+```
+
+Para dbt se necesita una conexión configurada localmente en `%USERPROFILE%\.dbt\profiles.yml`, con rol `TAXI_DBT_ROLE`, base `NYC_TAXI_DW`, warehouse `WH_TAXI_ETL` y acceso de lectura a RAW y escritura en STAGING/MARTS. La contraseña se entrega por variable de entorno y no se guarda en el repositorio.
+
+En Windows, ejecuta desde `lakehouse_taxi_dbt`:
+
+```powershell
+$credential = Get-Credential -UserName 'TU_USUARIO' -Message 'Contraseña de Snowflake'
+$env:DBT_ENV_SECRET_SNOWFLAKE_PASSWORD = $credential.GetNetworkCredential().Password
+$env:DBT_ENGINE_MANAGE_STATE = 'false'
+
+& '..\.venv-dbt\Scripts\dbt.exe' debug
+& '..\.venv-dbt\Scripts\dbt.exe' run --select "+mrt_demanda_mensual_distrito"
+& '..\.venv-dbt\Scripts\dbt.exe' test --select "stg_dim_zona stg_fct_demanda_diaria_zona mrt_demanda_mensual_distrito"
+& '..\.venv-dbt\Scripts\dbt.exe' docs generate
+
+Remove-Item Env:DBT_ENGINE_MANAGE_STATE
+Remove-Item Env:DBT_ENV_SECRET_SNOWFLAKE_PASSWORD
+
+& '..\.venv-dbt\Scripts\dbt.exe' docs serve --port 8081
+```
+
+El ajuste temporal `DBT_ENGINE_MANAGE_STATE=false` evita solicitar autenticación de dbt Platform para la función opcional dbt State. Puede generar un aviso de deprecación de namespace, pero no impide ejecutar dbt. `docs serve` mantiene abierto el servidor local; visita `http://localhost:8081` y usa `Ctrl+C` en la terminal para detenerlo.
+
 ### Capturas
 
 **Job con tres tareas encadenadas (bronze → silver → gold):**
@@ -170,6 +233,20 @@ docker compose exec spark python src/gold_taxis.py
 Las diferencias respecto a la versión local: tablas gestionadas de Unity Catalog en vez de rutas, `_metadata.file_name` en lugar de `input_file_name()`, y sin `persist()` (el cómputo serverless no lo admite).
 
 **Evidencia de ejecución:** las capturas anteriores corresponden a una corrida real del Job (tres tareas en verde), y la tabla de validación de la sección *Resultados* compara sus totales con los del pipeline local. El Job vive en el workspace de Databricks; en el repo se versionan los notebooks.
+
+### Snowflake y dbt
+
+**Conteos publicados en RAW:** las dos tablas recibieron las filas esperadas y todos los registros tienen fecha de carga.
+
+![Conteos y fechas de carga de las tablas RAW en Snowflake](docs/img/conteo_tablas_RAW.png)
+
+**Integridad referencial:** los hechos de demanda no contienen zonas ausentes en la dimensión.
+
+![Validación de hechos sin zona en la dimensión](docs/img/hechos_sin_zona.png)
+
+**Mart mensual:** resumen de los últimos 12 meses con viajes, ingresos e ingreso medio ponderado por viaje.
+
+![Resumen mensual del mart de demanda por distrito](docs/img/resumen_mensual_mart.png)
 
 ## Resultados
 
